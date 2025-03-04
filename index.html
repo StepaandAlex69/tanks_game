@@ -27,10 +27,22 @@
             border-radius: 10px;
             user-select: none; cursor: pointer;
         }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 15px;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body>
 <canvas id="gameCanvas"></canvas>
+<div id="score">Монеты: 0</div>
 <div id="controls">
     <div class="btn" id="btn-up">↑</div>
     <div class="row">
@@ -44,12 +56,14 @@
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    const scoreDisplay = document.getElementById("score");
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    let tank = { x: 0, y: 0, size: 40, speed: 22.5, dir: 'up' };
-    let coins = generateCoins(10);
+    let tank = { x: 0, y: 0, size: 40, speed: 22.5, baseSpeed: 22.5, slowSpeed: 15, dir: 'up' };
+    let coins = generateCoins(20);
     let movement = { up: false, down: false, left: false, right: false };
+    let score = 0;
 
     function generateCoins(count) {
         let arr = [];
@@ -90,6 +104,8 @@
         coins = coins.filter(coin => {
             let dist = Math.hypot(coin.x - tank.x, coin.y - tank.y);
             if (dist < tank.size / 2 + coin.size) {
+                score++;
+                scoreDisplay.textContent = `Монеты: ${score}`;
                 // Генерируем новую монету в радиусе 100px от танка
                 coins.push({
                     x: tank.x + (Math.random() * 200 - 100),
@@ -103,21 +119,21 @@
     }
 
     function moveTank() {
-        if (movement.up) {
+        let speed = Object.values(movement).some(v => v) ? tank.slowSpeed : tank.baseSpeed;if (movement.up) {
             tank.dir = 'up';
-            tank.y -= tank.speed;
+            tank.y -= speed;
         }
         if (movement.down) {
             tank.dir = 'down';
-            tank.y += tank.speed;
+            tank.y += speed;
         }
         if (movement.left) {
             tank.dir = 'left';
-            tank.x -= tank.speed;
+            tank.x -= speed;
         }
         if (movement.right) {
             tank.dir = 'right';
-            tank.x += tank.speed;
+            tank.x += speed;
         }
     }
 
@@ -128,7 +144,9 @@
         drawTank();
         checkCollisions();
         requestAnimationFrame(update);
-    }function setMove(direction, state) {
+    }
+
+    function setMove(direction, state) {
         movement[direction] = state;
     }
 
