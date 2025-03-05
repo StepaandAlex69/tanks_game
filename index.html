@@ -32,11 +32,23 @@
             padding: 5px 10px;
             border-radius: 5px;
         }
+        .message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div class="counter" id="ammoCounter">Патроны: 15</div>
+    <div class="counter" id="ammoCounter">Патроны: 0/15</div>
+    <div class="message" id="winMessage">Все патроны собраны!</div>
     <div class="controls">
         <div class="row">
             <button id="left">←</button>
@@ -56,15 +68,16 @@
 
         const gridSize = 16;
         const tileSize = Math.min(canvas.width, canvas.height) / gridSize;
-        let tank = { x: 8, y: 8, size: tileSize / 4, angle: 0 };
+        let tank = { x: 8, y: 8, size: tileSize / 4, direction: "up" };
         let ammo = [];
         let goal = { x: 15, y: 15 };
-        let ammoCount = 15;
+        let collectedAmmo = 0;
+        const totalAmmo = 15;
         let keys = { up: false, down: false, left: false, right: false };
         
         function spawnAmmo() {
             ammo = [];
-            while (ammo.length < 15) {
+            while (ammo.length < totalAmmo) {
                 let x = Math.floor(Math.random() * gridSize);
                 let y = Math.floor(Math.random() * gridSize);
                 if ((x !== 8 || y !== 8) && (x !== 15 || y !== 15)) {
@@ -82,8 +95,15 @@
 
             ctx.fillStyle = "black";
             ctx.save();
-            ctx.translate((tank.x + 0.5) * tileSize, (tank.y + 0.5) * tileSize);
-            ctx.rotate(tank.angle * Math.PI / 180);
+            let tankX = tank.x * tileSize;
+            let tankY = tank.y * tileSize;
+            ctx.translate(tankX + tileSize / 2, tankY + tileSize / 2);
+            
+            if (tank.direction === "up") ctx.rotate(0);
+            if (tank.direction === "right") ctx.rotate(Math.PI / 2);
+            if (tank.direction === "down") ctx.rotate(Math.PI);
+            if (tank.direction === "left") ctx.rotate(-Math.PI / 2);
+
             ctx.fillRect(-tank.size / 2, -tank.size / 2, tank.size, tank.size);
             ctx.restore();
 
@@ -94,41 +114,45 @@
                 ctx.strokeRect(bullet.x * tileSize + tileSize / 4, bullet.y * tileSize + tileSize / 4, tileSize / 2, tileSize / 4);
             });
 
-            document.getElementById("ammoCounter").innerText = `Патроны: ${ammoCount}`;
+            document.getElementById("ammoCounter").innerText = `Патроны: ${collectedAmmo}/${totalAmmo}`;
         }
 
         function update() {
-            let speed = keys.up ? 0.05 : keys.down ? -0.03 : 0;
-            if (speed !== 0) {
-                let rad = tank.angle * Math.PI / 180;
-                let newX = tank.x + Math.cos(rad) * speed;
-                let newY = tank.y + Math.sin(rad) * speed;
-                if (newX >= 0 && newX < gridSize && newY >= 0 && newY < gridSize) {
-                    tank.x = newX;
-                    tank.y = newY;
-                }
+            let moveX = 0, moveY = 0;
+            if (keys.up) { moveY = -1; tank.direction = "up"; }
+            if (keys.down) { moveY = 1; tank.direction = "down"; }
+            if (keys.left) { moveX = -1; tank.direction = "left"; }
+            if (keys.right) { moveX = 1; tank.direction = "right"; }
+
+            let newX = tank.x + moveX * 0.1;
+            let newY = tank.y + moveY * 0.1;
+
+            if (newX >= 0 && newX < gridSize && newY >= 0 && newY < gridSize) {
+                tank.x = newX;
+                tank.y = newY;
             }
-            if (keys.left) tank.angle -= 2;
-            if (keys.right) tank.angle += 2;
 
             ammo = ammo.filter(bullet => {
                 if (Math.abs(tank.x - bullet.x) < 0.4 && Math.abs(tank.y - bullet.y) < 0.4) {
-                    ammoCount--;
+                    collectedAmmo++;
                     return false;
                 }
                 return true;
             });
 
-            if (ammoCount === 0 && Math.abs(tank.x - goal.x) < 0.4 && Math.abs(tank.y - goal.y) < 0.4) {
-                ctx.fillStyle = "white";
-                ctx.font = "30px Arial";
-                ctx.fillText("Все патроны собраны!", canvas.width / 2 - 100, canvas.height / 2);
+            if (collectedAmmo === totalAmmo && Math.abs(tank.x - goal.x) < 0.4 && Math.abs(tank.y - goal.y) < 0.4) {
+                document.getElementById("winMessage").style.display = "block";
                 setTimeout(() => {
-                    tank = { x: 8, y: 8, size: tileSize / 4, angle: 0 };
-                    ammoCount = 15;
-                    spawnAmmo();
+                    document.getElementById("winMessage").style.display = "none";
+                    resetGame();
                 }, 10000);
             }
+        }
+
+        function resetGame() {
+            tank = { x: 8, y: 8, size: tileSize / 4, direction: "up" };
+            collectedAmmo = 0;
+            spawnAmmo();
         }
 
         function loop() {
