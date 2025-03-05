@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Танк и монетки</title>
+    <title>Сбор патронов</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #222; touch-action: manipulation; }
@@ -27,22 +27,20 @@
             border-radius: 10px;
             user-select: none; cursor: pointer;
         }
-        #score {
+        #message {
             position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 24px;
-            font-weight: bold;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 5px 15px;
-            border-radius: 10px;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px; font-weight: bold;
+            color: white; background: rgba(0, 0, 0, 0.8);
+            padding: 20px; border-radius: 10px;
+            display: none;
         }
     </style>
 </head>
 <body>
 <canvas id="gameCanvas"></canvas>
-<div id="score">Монеты: 0</div>
+<div id="message">Все патроны собраны</div>
 <div id="controls">
     <div class="btn" id="btn-up">↑</div>
     <div class="row">
@@ -56,98 +54,105 @@
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    const scoreDisplay = document.getElementById("score");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const message = document.getElementById("message");
+    canvas.width = 1280;
+    canvas.height = 1280;
 
-    let tank = { x: 0, y: 0, size: 40, speed: 15, baseSpeed: 15, slowSpeed: 15, dir: 'up' };
-    let coins = generateCoins(100);
+    const cellSize = 80;
+    let tank = { x: 8, y: 8, size: 20, speed: 20, dir: 'up' };
+    let bullets = generateBullets(15);
     let movement = { up: false, down: false, left: false, right: false };
-    let score = 0;
+    let collectedBullets = 0;
+    const baseLocation = { x: 15, y: 15 };
 
-    function generateCoins(count) {
+    function generateBullets(count) {
         let arr = [];
-        for (let i = 0; i < count; i++) {
-            arr.push({ x: (Math.random() * 2000) - 1000, y: (Math.random() * 2000) - 1000, size: 15 });
+        while (arr.length < count) {
+            let x = Math.floor(Math.random() * 16);
+            let y = Math.floor(Math.random() * 16);
+            if ((x !== 8 || y !== 8) && (x !== 15 || y !== 15)) {
+                arr.push({ x, y });
+            }
         }
         return arr;
     }
 
     function drawTank() {
         ctx.fillStyle = "black";
-        let { x, y, size, dir } = tank;
-        let cx = canvas.width / 2, cy = canvas.height / 2;
+        let cx = tank.x * cellSize + cellSize / 2;
+        let cy = tank.y * cellSize + cellSize / 2;
 
         ctx.save();
         ctx.translate(cx, cy);
-        if (dir === 'right') ctx.rotate(Math.PI / 2);
-        if (dir === 'down') ctx.rotate(Math.PI);
-        if (dir === 'left') ctx.rotate(-Math.PI / 2);
-        
-        ctx.fillRect(-size / 2, -size / 2, size, size);
-        ctx.fillRect(-10, -30, 20, 20);
+        if (tank.dir === 'right') ctx.rotate(Math.PI / 2);
+        if (tank.dir === 'down') ctx.rotate(Math.PI);
+        if (tank.dir === 'left') ctx.rotate(-Math.PI / 2);
+
+        ctx.fillRect(-tank.size / 2, -tank.size / 2, tank.size, tank.size);
+        ctx.fillRect(-5, -15, 10, 10);
         ctx.restore();
     }
 
-    function drawCoins() {
+    function drawBullets() {
         ctx.fillStyle = "yellow";
-        coins.forEach(coin => {
+        bullets.forEach(b => {
+            let cx = b.x * cellSize + cellSize / 2;
+            let cy = b.y * cellSize + cellSize / 2;
             ctx.beginPath();
-            ctx.arc(canvas.width / 2 + coin.x - tank.x, canvas.height / 2 + coin.y - tank.y, coin.size, 0, Math.PI * 2);
+            ctx.arc(cx, cy, 10, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "black";
             ctx.stroke();
         });
     }
 
+    function drawBase() {
+        ctx.fillStyle = "gray";
+        ctx.fillRect(baseLocation.x * cellSize, baseLocation.y * cellSize, cellSize, cellSize);
+    }
+
     function checkCollisions() {
-        coins = coins.filter(coin => {
-            let dist = Math.hypot(coin.x - tank.x, coin.y - tank.y);
-            if (dist < tank.size / 2 + coin.size) {
-                score++;
-                scoreDisplay.textContent = `Монеты: ${score}`;
-                // Генерируем новую монету в радиусе 100px от танка
-                coins.push({
-                    x: tank.x + (Math.random() * 200 - 100),
-                    y: tank.y + (Math.random() * 200 - 100),
-                    size: 15
-                });
+        bullets = bullets.filter(b => {
+            if (b.x === tank.x && b.y === tank.y) {
+                collectedBullets++;
                 return false;
             }
             return true;
         });
+
+        if (collectedBullets === 15 && tank.x === baseLocation.x && tank.y === baseLocation.y) {
+            message.style.display = "block";
+            setTimeout(resetGame, 10000);
+        }
     }
 
     function moveTank() {
-        let speed = Object.values(movement).some(v => v) ? tank.slowSpeed : tank.baseSpeed;if (movement.up) {
-            tank.dir = 'up';
-            tank.y -= speed;
-        }
-        if (movement.down) {
-            tank.dir = 'down';
-            tank.y += speed;
-        }
-        if (movement.left) {
-            tank.dir = 'left';
-            tank.x -= speed;
-        }
-        if (movement.right) {
-            tank.dir = 'right';
-            tank.x += speed;
-        }
+        if (movement.up && tank.y > 0) tank.y--;
+        if (movement.down && tank.y < 15) tank.y++;
+        if (movement.left && tank.x > 0) tank.x--;
+        if (movement.right && tank.x < 15) tank.x++;
     }
 
     function update() {
-        moveTank();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawCoins();
+        drawBase();
+        drawBullets();
         drawTank();
         checkCollisions();
         requestAnimationFrame(update);
     }
 
     function setMove(direction, state) {
-        movement[direction] = state;
+        movement = { up: false, down: false, left: false, right: false };
+        if (state) movement[direction] = true;
+    }
+
+    function resetGame() {
+        collectedBullets = 0;
+        bullets = generateBullets(15);
+        tank.x = 8;
+        tank.y = 8;
+        message.style.display = "none";
     }
 
     document.getElementById("btn-up").addEventListener("touchstart", () => setMove('up', true));
