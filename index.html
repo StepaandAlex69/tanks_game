@@ -3,170 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Сбор патронов</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Танковая игра</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #222; touch-action: manipulation; }
-        canvas { display: block; background: #228B22; }
-        #controls {
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            background: green;
+        }
+        .controls {
             position: absolute;
             bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            z-index: 10;
+            left: 10px;
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            gap: 5px;
         }
-        .row { display: flex; }
         .btn {
-            width: 60px; height: 60px;
-            margin: 5px; font-size: 28px;
-            text-align: center; line-height: 60px;
-            border: 2px solid black; background: rgba(255, 255, 255, 0.7);
-            border-radius: 10px;
-            user-select: none; cursor: pointer;
-        }
-        #message {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 32px; font-weight: bold;
-            color: white; background: rgba(0, 0, 0, 0.8);
-            padding: 20px; border-radius: 10px;
-            display: none;
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+            text-align: center;
+            line-height: 50px;
+            background: lightgray;
+            border: 2px solid black;
+            cursor: pointer;
+            user-select: none;
         }
     </style>
 </head>
 <body>
-<canvas id="gameCanvas"></canvas>
-<div id="message">Все патроны собраны</div>
-<div id="controls">
-    <div class="btn" id="btn-up">↑</div>
-    <div class="row">
-        <div class="btn" id="btn-left">←</div>
-        <div style="width: 60px;"></div>
-        <div class="btn" id="btn-right">→</div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        <div></div>
+        <div class="btn" id="up">↑</div>
+        <div></div>
+        <div class="btn" id="left">←</div>
+        <div></div>
+        <div class="btn" id="right">→</div>
+        <div></div>
+        <div class="btn" id="down">↓</div>
+        <div></div>
     </div>
-    <div class="btn" id="btn-down">↓</div>
-</div>
 
-<script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const message = document.getElementById("message");
-    canvas.width = 1280;
-    canvas.height = 1280;
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
 
-    const cellSize = 80;
-    let tank = { x: 8, y: 8, size: 20, speed: 20, dir: 'up' };
-    let bullets = generateBullets(15);
-    let movement = { up: false, down: false, left: false, right: false };
-    let collectedBullets = 0;
-    const baseLocation = { x: 15, y: 15 };
+        const TILE_SIZE = 40;
+        const FIELD_SIZE = 16;
+        canvas.width = TILE_SIZE * FIELD_SIZE;
+        canvas.height = TILE_SIZE * FIELD_SIZE;
 
-    function generateBullets(count) {
-        let arr = [];
-        while (arr.length < count) {
-            let x = Math.floor(Math.random() * 16);
-            let y = Math.floor(Math.random() * 16);
-            if ((x !== 8 || y !== 8) && (x !== 15 || y !== 15)) {
-                arr.push({ x, y });
-            }
+        const tank = {
+            x: Math.floor(FIELD_SIZE / 2) * TILE_SIZE,
+            y: Math.floor(FIELD_SIZE / 2) * TILE_SIZE,
+            width: TILE_SIZE / 4,
+            height: TILE_SIZE / 4,
+            speed: 2,
+            dx: 0,
+            dy: 0,
+        };
+
+        const bullets = [];
+        for (let i = 0; i < 15; i++) {
+            bullets.push({
+                x: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
+                y: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
+                width: TILE_SIZE / 2,
+                height: TILE_SIZE / 6,
+            });
         }
-        return arr;
-    }
 
-    function drawTank() {
-        ctx.fillStyle = "black";
-        let cx = tank.x * cellSize + cellSize / 2;
-        let cy = tank.y * cellSize + cellSize / 2;
+        const goal = {
+            x: (FIELD_SIZE - 1) * TILE_SIZE,
+            y: (FIELD_SIZE - 1) * TILE_SIZE,
+            width: TILE_SIZE,
+            height: TILE_SIZE,
+        };
 
-        ctx.save();
-        ctx.translate(cx, cy);
-        if (tank.dir === 'right') ctx.rotate(Math.PI / 2);
-        if (tank.dir === 'down') ctx.rotate(Math.PI);
-        if (tank.dir === 'left') ctx.rotate(-Math.PI / 2);
+        let score = 0;
+        let isGameOver = false;
 
-        ctx.fillRect(-tank.size / 2, -tank.size / 2, tank.size, tank.size);
-        ctx.fillRect(-5, -15, 10, 10);
-        ctx.restore();
-    }
+        function drawTank() {
+            ctx.fillStyle = "black";
+            ctx.fillRect(tank.x + tank.width / 2, tank.y, tank.width, tank.height * 2);
+            ctx.fillRect(tank.x, tank.y + tank.height, tank.width * 2, tank.height * 2);
+        }
 
-    function drawBullets() {
-        ctx.fillStyle = "yellow";
-        bullets.forEach(b => {
-            let cx = b.x * cellSize + cellSize / 2;
-            let cy = b.y * cellSize + cellSize / 2;
-            ctx.beginPath();
-            ctx.arc(cx, cy, 10, 0, Math.PI * 2);
-            ctx.fill();
+        function drawBullets() {
+            ctx.fillStyle = "red";
             ctx.strokeStyle = "black";
-            ctx.stroke();
-        });
-    }
-
-    function drawBase() {
-        ctx.fillStyle = "gray";
-        ctx.fillRect(baseLocation.x * cellSize, baseLocation.y * cellSize, cellSize, cellSize);
-    }
-
-    function checkCollisions() {
-        bullets = bullets.filter(b => {
-            if (b.x === tank.x && b.y === tank.y) {
-                collectedBullets++;
-                return false;
-            }
-            return true;
-        });
-
-        if (collectedBullets === 15 && tank.x === baseLocation.x && tank.y === baseLocation.y) {
-            message.style.display = "block";
-            setTimeout(resetGame, 10000);
+            bullets.forEach((bullet) => {
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                ctx.strokeRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
         }
-    }
 
-    function moveTank() {
-        if (movement.up && tank.y > 0) tank.y--;
-        if (movement.down && tank.y < 15) tank.y++;
-        if (movement.left && tank.x > 0) tank.x--;
-        if (movement.right && tank.x < 15) tank.x++;
-    }
+        function drawGoal() {
+            ctx.fillStyle = "gray";
+            ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+        }
 
-    function update() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawBase();
-        drawBullets();
-        drawTank();
-        checkCollisions();
-        requestAnimationFrame(update);
-    }
+        function drawScore() {
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText(`Патроны: ${score}/15`, tank.x - 20, tank.y - 10);
+        }
 
-    function setMove(direction, state) {
-        movement = { up: false, down: false, left: false, right: false };
-        if (state) movement[direction] = true;
-    }
+        function update() {
+            if (isGameOver) return;
 
-    function resetGame() {
-        collectedBullets = 0;
-        bullets = generateBullets(15);
-        tank.x = 8;
-        tank.y = 8;
-        message.style.display = "none";
-    }
+            tank.x += tank.dx;
+            tank.y += tank.dy;
 
-    document.getElementById("btn-up").addEventListener("touchstart", () => setMove('up', true));
-    document.getElementById("btn-down").addEventListener("touchstart", () => setMove('down', true));
-    document.getElementById("btn-left").addEventListener("touchstart", () => setMove('left', true));
-    document.getElementById("btn-right").addEventListener("touchstart", () => setMove('right', true));
+            if (tank.x < 0) tank.x = 0;
+            if (tank.y < 0) tank.y = 0;
+            if (tank.x > (FIELD_SIZE - 1) * TILE_SIZE) tank.x = (FIELD_SIZE - 1) * TILE_SIZE;
+            if (tank.y > (FIELD_SIZE - 1) * TILE_SIZE) tank.y = (FIELD_SIZE - 1) * TILE_SIZE;
 
-    document.getElementById("btn-up").addEventListener("touchend", () => setMove('up', false));
-    document.getElementById("btn-down").addEventListener("touchend", () => setMove('down', false));
-    document.getElementById("btn-left").addEventListener("touchend", () => setMove('left', false));
-    document.getElementById("btn-right").addEventListener("touchend", () => setMove('right', false));
+            bullets.forEach((bullet, index) => {
+                if (
+                    tank.x < bullet.x + bullet.width &&
+                    tank.x + tank.width * 2 > bullet.x &&
+                    tank.y < bullet.y + bullet.height &&
+                    tank.y + tank.height * 2 > bullet.y
+                ) {
+                    bullets.splice(index, 1);
+                    score++;
+                }
+            });
 
-    Telegram.WebApp.ready();
-    update();
-</script>
+            if (score === 15 && tank.x === goal.x && tank.y === goal.y) {
+                isGameOver = true;
+                setTimeout(() => {
+                    score = 0;
+                    tank.x = Math.floor(FIELD_SIZE / 2) * TILE_SIZE;
+                    tank.y = Math.floor(FIELD_SIZE / 2) * TILE_SIZE;
+                    bullets.length = 0;
+                    for (let i = 0; i < 15; i++) {
+                        bullets.push({
+                            x: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
+                            y: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
+                            width: TILE_SIZE / 2,
+                            height: TILE_SIZE / 6,
+                        });
+                    }
+                    isGameOver = false;
+                }, 10000);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawGoal();
+            drawBullets();
+            drawTank();
+            drawScore();
+
+            if (isGameOver) {
+                ctx.fillStyle = "white";
+                ctx.font = "30px Arial";
+                ctx.fillText("Все патроны собраны!", canvas.width / 4, canvas.height / 2);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+
+        function move(direction) {
+            const speed = 2;
+            if (direction === "up") {
+                tank.dx = 0;
+                tank.dy = -speed;
+            } else if (direction === "down") {
+                tank.dx = 0;
+                tank.dy = speed;
+            } else if (direction === "left") {
+                tank.dx = -speed;
+                tank.dy = 0;
+            } else if (direction === "right") {
+                tank.dx = speed;
+                tank.dy = 0;
+            }
+        }
+
+        function stop() {
+            tank.dx = 0;
+            tank.dy = 0;
+        }
+
+        document.getElementById("up").addEventListener("mousedown", () => move("up"));
+        document.getElementById("down").addEventListener("mousedown", () => move("down"));
+        document.getElementById("left").addEventListener("mousedown", () => move("left"));
+        document.getElementById("right").addEventListener("mousedown", () => move("right"));
+
+        document.getElementById("up").addEventListener("mouseup", stop);
+        document.getElementById("down").addEventListener("mouseup", stop);
+        document.getElementById("left").addEventListener("mouseup", stop);
+        document.getElementById("right").addEventListener("mouseup", stop);
+    </script>
 </body>
 </html>
