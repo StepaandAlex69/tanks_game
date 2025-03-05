@@ -5,215 +5,156 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Танковая игра</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: black;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        canvas {
-            background: green;
-        }
+        body { margin: 0; overflow: hidden; touch-action: none; }
+        canvas { display: block; background: green; }
         .controls {
             position: absolute;
-            bottom: 10px;
             left: 10px;
-            display: grid;
-            grid-template-columns: repeat(3, 50px);
+            bottom: 10px;
+            display: flex;
+            flex-direction: column;
             gap: 5px;
         }
-        .btn {
-            width: 50px;
-            height: 50px;
+        .controls button {
+            width: 50px; height: 50px;
             font-size: 20px;
-            text-align: center;
-            line-height: 50px;
-            background: lightgray;
-            border: 2px solid black;
-            cursor: pointer;
-            user-select: none;
+            touch-action: manipulation;
+        }
+        .row { display: flex; justify-content: center; gap: 5px; }
+        .counter {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div class="counter" id="ammoCounter">Патроны: 15</div>
     <div class="controls">
-        <div></div>
-        <div class="btn" id="up">↑</div>
-        <div></div>
-        <div class="btn" id="left">←</div>
-        <div></div>
-        <div class="btn" id="right">→</div>
-        <div></div>
-        <div class="btn" id="down">↓</div>
-        <div></div>
+        <div class="row">
+            <button id="left">←</button>
+            <button id="up">↑</button>
+            <button id="right">→</button>
+        </div>
+        <div class="row">
+            <button id="down">↓</button>
+        </div>
     </div>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        const TILE_SIZE = 40;
-        const FIELD_SIZE = 16;
-        canvas.width = TILE_SIZE * FIELD_SIZE;
-        canvas.height = TILE_SIZE * FIELD_SIZE;
-
-        const tank = {
-            x: Math.floor(FIELD_SIZE / 2) * TILE_SIZE,
-            y: Math.floor(FIELD_SIZE / 2) * TILE_SIZE,
-            width: TILE_SIZE / 4,
-            height: TILE_SIZE / 4,
-            speed: 2,
-            dx: 0,
-            dy: 0,
-        };
-
-        const bullets = [];
-        for (let i = 0; i < 15; i++) {
-            bullets.push({
-                x: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
-                y: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
-                width: TILE_SIZE / 2,
-                height: TILE_SIZE / 6,
-            });
-        }
-
-        const goal = {
-            x: (FIELD_SIZE - 1) * TILE_SIZE,
-            y: (FIELD_SIZE - 1) * TILE_SIZE,
-            width: TILE_SIZE,
-            height: TILE_SIZE,
-        };
-
-        let score = 0;
-        let isGameOver = false;
-
-        function drawTank() {
-            ctx.fillStyle = "black";
-            ctx.fillRect(tank.x + tank.width / 2, tank.y, tank.width, tank.height * 2);
-            ctx.fillRect(tank.x, tank.y + tank.height, tank.width * 2, tank.height * 2);
-        }
-
-        function drawBullets() {
-            ctx.fillStyle = "red";
-            ctx.strokeStyle = "black";
-            bullets.forEach((bullet) => {
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
-                ctx.strokeRect(bullet.x, bullet.y, bullet.width, bullet.height);
-            });
-        }
-
-        function drawGoal() {
-            ctx.fillStyle = "gray";
-            ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
-        }
-
-        function drawScore() {
-            ctx.fillStyle = "white";
-            ctx.font = "20px Arial";
-            ctx.fillText(`Патроны: ${score}/15`, tank.x - 20, tank.y - 10);
-        }
-
-        function update() {
-            if (isGameOver) return;
-
-            tank.x += tank.dx;
-            tank.y += tank.dy;
-
-            if (tank.x < 0) tank.x = 0;
-            if (tank.y < 0) tank.y = 0;
-            if (tank.x > (FIELD_SIZE - 1) * TILE_SIZE) tank.x = (FIELD_SIZE - 1) * TILE_SIZE;
-            if (tank.y > (FIELD_SIZE - 1) * TILE_SIZE) tank.y = (FIELD_SIZE - 1) * TILE_SIZE;
-
-            bullets.forEach((bullet, index) => {
-                if (
-                    tank.x < bullet.x + bullet.width &&
-                    tank.x + tank.width * 2 > bullet.x &&
-                    tank.y < bullet.y + bullet.height &&
-                    tank.y + tank.height * 2 > bullet.y
-                ) {
-                    bullets.splice(index, 1);
-                    score++;
+        const gridSize = 16;
+        const tileSize = Math.min(canvas.width, canvas.height) / gridSize;
+        let tank = { x: 8, y: 8, size: tileSize / 4, angle: 0 };
+        let ammo = [];
+        let goal = { x: 15, y: 15 };
+        let ammoCount = 15;
+        let keys = { up: false, down: false, left: false, right: false };
+        
+        function spawnAmmo() {
+            ammo = [];
+            while (ammo.length < 15) {
+                let x = Math.floor(Math.random() * gridSize);
+                let y = Math.floor(Math.random() * gridSize);
+                if ((x !== 8 || y !== 8) && (x !== 15 || y !== 15)) {
+                    ammo.push({ x, y });
                 }
-            });
-
-            if (score === 15 && tank.x === goal.x && tank.y === goal.y) {
-                isGameOver = true;
-                setTimeout(() => {
-                    score = 0;
-                    tank.x = Math.floor(FIELD_SIZE / 2) * TILE_SIZE;
-                    tank.y = Math.floor(FIELD_SIZE / 2) * TILE_SIZE;
-                    bullets.length = 0;
-                    for (let i = 0; i < 15; i++) {
-                        bullets.push({
-                            x: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
-                            y: Math.floor(Math.random() * FIELD_SIZE) * TILE_SIZE,
-                            width: TILE_SIZE / 2,
-                            height: TILE_SIZE / 6,
-                        });
-                    }
-                    isGameOver = false;
-                }, 10000);
             }
         }
+        spawnAmmo();
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            drawGoal();
-            drawBullets();
-            drawTank();
-            drawScore();
+            ctx.fillStyle = "gray";
+            ctx.fillRect(goal.x * tileSize, goal.y * tileSize, tileSize, tileSize);
 
-            if (isGameOver) {
+            ctx.fillStyle = "black";
+            ctx.save();
+            ctx.translate((tank.x + 0.5) * tileSize, (tank.y + 0.5) * tileSize);
+            ctx.rotate(tank.angle * Math.PI / 180);
+            ctx.fillRect(-tank.size / 2, -tank.size / 2, tank.size, tank.size);
+            ctx.restore();
+
+            ctx.fillStyle = "red";
+            ctx.strokeStyle = "black";
+            ammo.forEach(bullet => {
+                ctx.fillRect(bullet.x * tileSize + tileSize / 4, bullet.y * tileSize + tileSize / 4, tileSize / 2, tileSize / 4);
+                ctx.strokeRect(bullet.x * tileSize + tileSize / 4, bullet.y * tileSize + tileSize / 4, tileSize / 2, tileSize / 4);
+            });
+
+            document.getElementById("ammoCounter").innerText = `Патроны: ${ammoCount}`;
+        }
+
+        function update() {
+            let speed = keys.up ? 0.05 : keys.down ? -0.03 : 0;
+            if (speed !== 0) {
+                let rad = tank.angle * Math.PI / 180;
+                let newX = tank.x + Math.cos(rad) * speed;
+                let newY = tank.y + Math.sin(rad) * speed;
+                if (newX >= 0 && newX < gridSize && newY >= 0 && newY < gridSize) {
+                    tank.x = newX;
+                    tank.y = newY;
+                }
+            }
+            if (keys.left) tank.angle -= 2;
+            if (keys.right) tank.angle += 2;
+
+            ammo = ammo.filter(bullet => {
+                if (Math.abs(tank.x - bullet.x) < 0.4 && Math.abs(tank.y - bullet.y) < 0.4) {
+                    ammoCount--;
+                    return false;
+                }
+                return true;
+            });
+
+            if (ammoCount === 0 && Math.abs(tank.x - goal.x) < 0.4 && Math.abs(tank.y - goal.y) < 0.4) {
                 ctx.fillStyle = "white";
                 ctx.font = "30px Arial";
-                ctx.fillText("Все патроны собраны!", canvas.width / 4, canvas.height / 2);
+                ctx.fillText("Все патроны собраны!", canvas.width / 2 - 100, canvas.height / 2);
+                setTimeout(() => {
+                    tank = { x: 8, y: 8, size: tileSize / 4, angle: 0 };
+                    ammoCount = 15;
+                    spawnAmmo();
+                }, 10000);
             }
         }
 
-        function gameLoop() {
+        function loop() {
             update();
             draw();
-            requestAnimationFrame(gameLoop);
+            requestAnimationFrame(loop);
+        }
+        loop();
+
+        function setKey(key, state) {
+            keys[key] = state;
         }
 
-        gameLoop();
+        document.getElementById("up").onpointerdown = () => setKey("up", true);
+        document.getElementById("up").onpointerup = () => setKey("up", false);
+        document.getElementById("down").onpointerdown = () => setKey("down", true);
+        document.getElementById("down").onpointerup = () => setKey("down", false);
+        document.getElementById("left").onpointerdown = () => setKey("left", true);
+        document.getElementById("left").onpointerup = () => setKey("left", false);
+        document.getElementById("right").onpointerdown = () => setKey("right", true);
+        document.getElementById("right").onpointerup = () => setKey("right", false);
 
-        function move(direction) {
-            const speed = 2;
-            if (direction === "up") {
-                tank.dx = 0;
-                tank.dy = -speed;
-            } else if (direction === "down") {
-                tank.dx = 0;
-                tank.dy = speed;
-            } else if (direction === "left") {
-                tank.dx = -speed;
-                tank.dy = 0;
-            } else if (direction === "right") {
-                tank.dx = speed;
-                tank.dy = 0;
-            }
-        }
-
-        function stop() {
-            tank.dx = 0;
-            tank.dy = 0;
-        }
-
-        document.getElementById("up").addEventListener("mousedown", () => move("up"));
-        document.getElementById("down").addEventListener("mousedown", () => move("down"));
-        document.getElementById("left").addEventListener("mousedown", () => move("left"));
-        document.getElementById("right").addEventListener("mousedown", () => move("right"));
-
-        document.getElementById("up").addEventListener("mouseup", stop);
-        document.getElementById("down").addEventListener("mouseup", stop);
-        document.getElementById("left").addEventListener("mouseup", stop);
-        document.getElementById("right").addEventListener("mouseup", stop);
+        window.addEventListener("resize", () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
     </script>
 </body>
 </html>
