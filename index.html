@@ -2,10 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Танковая игра</title>
     <style>
-        body { margin: 0; overflow: hidden; touch-action: none; background: white; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        body { margin: 0; overflow: hidden; touch-action: none; display: flex; align-items: center; justify-content: center; height: 100vh; background: white; }
         canvas { background: green; }
         .controls {
             position: absolute;
@@ -64,12 +64,12 @@
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const gridSize = 16;
-        const tileSize = 40; // Размер клетки
+        const tileSize = Math.min(window.innerWidth, window.innerHeight) / (gridSize + 2); // Подгоняем размер под экран
         canvas.width = gridSize * tileSize;
         canvas.height = gridSize * tileSize;
 
         let tankImg = new Image();
-        tankImg.src = "https://t3.ftcdn.net/jpg/02/43/10/30/360_F_243103099_vsIDZgaQvobOKW8GGyIpQ0jxbfzmcJjO.jpg"; // Установи свою текстуру танка
+        tankImg.src = "https://i.imgur.com/6IxnUeY.png"; // Установи свою текстуру танка
 
         let tank = { x: 8, y: 8, size: tileSize / 1.5, direction: "up" };
         let ammo = [];
@@ -77,7 +77,7 @@
         let collectedAmmo = 0;
         const totalAmmo = 15;
         let keys = { up: false, down: false, left: false, right: false };
-        
+
         function spawnAmmo() {
             ammo = [];
             while (ammo.length < totalAmmo) {
@@ -100,7 +100,7 @@
             let tankX = tank.x * tileSize;
             let tankY = tank.y * tileSize;
             ctx.translate(tankX + tileSize / 2, tankY + tileSize / 2);
-            
+
             if (tank.direction === "up") ctx.rotate(0);
             if (tank.direction === "right") ctx.rotate(Math.PI / 2);
             if (tank.direction === "down") ctx.rotate(Math.PI);
@@ -112,8 +112,8 @@
             ctx.fillStyle = "red";
             ctx.strokeStyle = "black";
             ammo.forEach(bullet => {
-                ctx.fillRect(bullet.x * tileSize + tileSize / 4, bullet.y * tileSize + tileSize / 4, tileSize / 2, tileSize / 4);
-                ctx.strokeRect(bullet.x * tileSize + tileSize / 4, bullet.y * tileSize + tileSize / 4, tileSize / 2, tileSize / 4);
+                ctx.fillRect(bullet.x * tileSize + tileSize / 4 - 2, bullet.y * tileSize + tileSize / 4 - 2, tileSize / 2, tileSize / 4);
+                ctx.strokeRect(bullet.x * tileSize + tileSize / 4 - 2, bullet.y * tileSize + tileSize / 4 - 2, tileSize / 2, tileSize / 4);
             });
 
             document.getElementById("ammoCounter").innerText = `Патроны: ${collectedAmmo}/${totalAmmo}`;
@@ -129,7 +129,7 @@
             let newX = tank.x + moveX * 0.1;
             let newY = tank.y + moveY * 0.1;
 
-            if (newX >= 0 && newX < gridSize && newY >= 0 && newY < gridSize) {
+            if (newX >= 0 && newX < gridSize - 1 && newY >= 0 && newY < gridSize - 1) {
                 tank.x = newX;
                 tank.y = newY;
             }
