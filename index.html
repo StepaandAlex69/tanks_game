@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Танковая игра</title>
     <style>
-        body { margin: 0; overflow: hidden; touch-action: none; }
-        canvas { display: block; background: green; }
+        body { margin: 0; overflow: hidden; touch-action: none; background: white; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        canvas { background: green; }
         .controls {
             position: absolute;
             left: 10px;
@@ -63,12 +63,15 @@
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
         const gridSize = 16;
-        const tileSize = Math.min(canvas.width, canvas.height) / gridSize;
-        let tank = { x: 8, y: 8, size: tileSize / 4, direction: "up" };
+        const tileSize = 40; // Размер клетки
+        canvas.width = gridSize * tileSize;
+        canvas.height = gridSize * tileSize;
+
+        let tankImg = new Image();
+        tankImg.src = "https://i.imgur.com/6IxnUeY.png"; // Установи свою текстуру танка
+
+        let tank = { x: 8, y: 8, size: tileSize / 1.5, direction: "up" };
         let ammo = [];
         let goal = { x: 15, y: 15 };
         let collectedAmmo = 0;
@@ -93,7 +96,6 @@
             ctx.fillStyle = "gray";
             ctx.fillRect(goal.x * tileSize, goal.y * tileSize, tileSize, tileSize);
 
-            ctx.fillStyle = "black";
             ctx.save();
             let tankX = tank.x * tileSize;
             let tankY = tank.y * tileSize;
@@ -104,7 +106,7 @@
             if (tank.direction === "down") ctx.rotate(Math.PI);
             if (tank.direction === "left") ctx.rotate(-Math.PI / 2);
 
-            ctx.fillRect(-tank.size / 2, -tank.size / 2, tank.size, tank.size);
+            ctx.drawImage(tankImg, -tank.size / 2, -tank.size / 2, tank.size, tank.size);
             ctx.restore();
 
             ctx.fillStyle = "red";
@@ -150,7 +152,7 @@
         }
 
         function resetGame() {
-            tank = { x: 8, y: 8, size: tileSize / 4, direction: "up" };
+            tank = { x: 8, y: 8, size: tileSize / 1.5, direction: "up" };
             collectedAmmo = 0;
             spawnAmmo();
         }
@@ -174,11 +176,6 @@
         document.getElementById("left").onpointerup = () => setKey("left", false);
         document.getElementById("right").onpointerdown = () => setKey("right", true);
         document.getElementById("right").onpointerup = () => setKey("right", false);
-
-        window.addEventListener("resize", () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
     </script>
 </body>
 </html>
